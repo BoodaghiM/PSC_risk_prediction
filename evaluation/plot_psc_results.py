@@ -2,30 +2,38 @@
 """
 plot_psc_results.py
 
+GitHub-friendly plotting script for PSC results.
+
 Creates plots from:
-A) Initial single-modality runs (nestedcv_oof_predictions.csv with columns: y_true,y_oof_prob)
+A) (Optional) Old single-modality runs (nestedcv_oof_predictions.csv with columns: y_true,y_oof_prob)
 B) Unified multi-modal run (oof_predictions.csv with proba_* columns)
-C) SHAP summaries:
+C) SHAP summaries (optional):
    - Early: shap_multi_early.csv (feature, mean_abs_shap) -> top 20 bar plot
    - Late : shap_multi_late_meta_lr.csv (feature, mean_abs_shap) -> modality bar plot
 
 Outputs (in --out-dir):
-  - roc_single_only.png
-  - roc_multi_and_single.png
-  - shap_early_late_combined.png   (subplots: Early top20 + Late modality importance)
+  - roc_single_only.png            (only if old single inputs exist)
+  - roc_multi_and_single.png       (requires unified oof_predictions.csv)
+  - shap_early_late_combined.png   (only if early+late SHAP files exist)
 
 Defaults:
-  --out-dir defaults to: /common/mcgoverndlab/usr/Miad/PSC/results_no_leakage/plots
-  DPI defaults to 1000 per your request.
+  --out-dir defaults to: results/plots
+  --run-dir defaults to: results/multi_modal/latest
+  DPI defaults to 300 (GitHub-friendly). You can set --dpi 1000 if desired.
 
-Usage:
-  python plot_psc_results.py
-  python plot_psc_results.py --also-pdf
-  python plot_psc_results.py --out-dir /some/other/path
+Usage examples:
+  # 1) Plot from a specific run directory
+  python evaluation/plot_psc_results.py \
+    --run-dir /path/to/run_YYYYMMDD_HHMMSS \
+    --out-dir /path/to/plots
+
+  # 2) Plot from "latest" pointer inside repo
+  python evaluation/plot_psc_results.py
 
 Notes:
 - Uses matplotlib only (no seaborn).
-- Does not set any custom colors unless you later request it.
+- Does not set any custom colors.
+- Skips plots gracefully if optional input files are missing.
 """
 
 from __future__ import annotations
@@ -33,7 +41,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 
 import numpy as np
 import pandas as pd
@@ -43,12 +51,17 @@ from sklearn.metrics import roc_curve, roc_auc_score
 
 
 # -------------------------
-# Utilities
+# Defaults (GitHub-friendly)
 # -------------------------
 
-DEFAULT_OUT_DIR = "/common/mcgoverndlab/usr/Miad/PSC/results_no_leakage/plots"
-DEFAULT_DPI = 1000
+DEFAULT_OUT_DIR = "results/plots"
+DEFAULT_RUN_DIR = "results/multi_modal/latest"
+DEFAULT_DPI = 300
 
+
+# -------------------------
+# Utilities
+# -------------------------
 
 def ensure_dir(p: str) -> None:
     os.makedirs(p, exist_ok=True)
@@ -75,7 +88,7 @@ def load_old_single_oof(path: str) -> Tuple[np.ndarray, np.ndarray]:
 
 def load_new_multi_oof(path: str) -> pd.DataFrame:
     """
-    New unified format: expects y_true and proba_* columns
+    Unified format: expects y_true and proba_* columns
     """
     df = pd.read_csv(path)
     if "y_true" not in df.columns:
@@ -165,18 +178,24 @@ def plot_shap_early_and_late(
 
     # (A) Early
     axes[0].barh(shap_early["feature"], shap_early["mean_abs_shap"])
-    axes[0].set_title("(A) Early Integration: Top 20 Feature Importance (SHAP)")
+    axes[0].set_title(f"(A) Early Integration: Top {top_k} Feature Importance (SHAP)")
     axes[0].set_xlabel("Mean(|SHAP value|)")
     axes[0].grid(True, axis="x", alpha=0.4)
 
     # (B) Late
     axes[1].barh(shap_late["feature"], shap_late["mean_abs_shap"])
-    axes[1].set_title("(B) Late Integration")
+    axes[1].set_title("(B) Late Integration (Meta-model)")
     axes[1].set_xlabel("Mean(|SHAP value|)")
     axes[1].grid(True, axis="x", alpha=0.4)
 
     savefig_all(fig, out_path_png, dpi=dpi, also_pdf=also_pdf)
     plt.close(fig)
+
+
+def try_path(p: Optional[str]) -> Optional[str]:
+    if p and os.path.exists(p):
+        return p
+    return None
 
 
 # -------------------------
@@ -200,67 +219,78 @@ def main():
     )
     parser.add_argument("--also-pdf", action="store_true", help="Also save PDF copies.")
 
-    # Old single-modality OOFs
+    # Unified run folder (GitHub-friendly)
     parser.add_argument(
-        "--single-clinical",
-        default="/common/mcgoverndlab/usr/Miad/PSC/results_no_leakage/clinical/nestedcv_oof_predictions.csv",
-    )
-    parser.add_argument(
-        "--single-genetics",
-        default="/common/mcgoverndlab/usr/Miad/PSC/results_no_leakage/genetics/nestedcv_oof_predictions.csv",
-    )
-    parser.add_argument(
-        "--single-lab",
-        default="/common/mcgoverndlab/usr/Miad/PSC/results_no_leakage/lab/nestedcv_oof_predictions.csv",
-    )
-    parser.add_argument(
-        "--single-serology",
-        default="/common/mcgoverndlab/usr/Miad/PSC/results_no_leakage/serology/nestedcv_oof_predictions.csv",
+        "--run-dir",
+        default=DEFAULT_RUN_DIR,
+        help=(
+            "Directory containing unified outputs (oof_predictions.csv, shap_multi_early.csv, "
+            "shap_multi_late_meta_lr.csv). Default: results/multi_modal/latest"
+        ),
     )
 
-    # New unified run outputs
-    parser.add_argument(
-        "--multi-oof",
-        default="/common/mcgoverndlab/usr/Miad/PSC/results_no_leakage/multi_modal_all_in_one/oof_predictions.csv",
-    )
-    parser.add_argument(
-        "--shap-early",
-        default="/common/mcgoverndlab/usr/Miad/PSC/results_no_leakage/multi_modal_all_in_one/shap_multi_early.csv",
-    )
-    parser.add_argument(
-        "--shap-late",
-        default="/common/mcgoverndlab/usr/Miad/PSC/results_no_leakage/multi_modal_all_in_one/shap_multi_late_meta_lr.csv",
-    )
+    # Old single-modality OOFs (optional)
+    parser.add_argument("--single-clinical", default=None, help="Path to old clinical nestedcv_oof_predictions.csv")
+    parser.add_argument("--single-genetics", default=None, help="Path to old genetics nestedcv_oof_predictions.csv")
+    parser.add_argument("--single-lab", default=None, help="Path to old lab nestedcv_oof_predictions.csv")
+    parser.add_argument("--single-serology", default=None, help="Path to old serology nestedcv_oof_predictions.csv")
+
+    # Allow overriding filenames inside run-dir (rarely needed)
+    parser.add_argument("--multi-oof", default=None, help="Override: path to unified oof_predictions.csv")
+    parser.add_argument("--shap-early", default=None, help="Override: path to shap_multi_early.csv")
+    parser.add_argument("--shap-late", default=None, help="Override: path to shap_multi_late_meta_lr.csv")
+    parser.add_argument("--top-k", type=int, default=20, help="Top-k features for early SHAP barplot (default: 20)")
 
     args = parser.parse_args()
     ensure_dir(args.out_dir)
 
-    # -------------------------
-    # 1) ROC: old single modalities only
-    # -------------------------
-    old_curves = {}
-    for name, path in [
-        ("Lab", args.single_lab),
-        ("Serology", args.single_serology),
-        ("Clinical", args.single_clinical),
-        ("Genetics", args.single_genetics),
-    ]:
-        if not os.path.exists(path):
-            raise FileNotFoundError(f"Missing file for {name}: {path}")
-        y_true, y_prob = load_old_single_oof(path)
-        old_curves[name] = (y_true, y_prob)
-
-    fig1 = plot_roc_curves(old_curves, title="ROC Curves (Single Modalities)")
-    savefig_all(fig1, os.path.join(args.out_dir, "roc_single_only.png"), dpi=args.dpi, also_pdf=args.also_pdf)
-    plt.close(fig1)
+    # Resolve unified run paths
+    run_dir = args.run_dir
+    multi_oof = args.multi_oof or os.path.join(run_dir, "oof_predictions.csv")
+    shap_early = args.shap_early or os.path.join(run_dir, "shap_multi_early.csv")
+    shap_late = args.shap_late or os.path.join(run_dir, "shap_multi_late_meta_lr.csv")
 
     # -------------------------
-    # 2) ROC: new multi + new singles together
+    # 1) ROC: old single modalities only (OPTIONAL)
     # -------------------------
-    if not os.path.exists(args.multi_oof):
-        raise FileNotFoundError(f"Missing multi OOF file: {args.multi_oof}")
+    # If user didn't pass explicit old paths, we simply skip this figure.
+    old_paths = {
+        "Lab": args.single_lab,
+        "Serology": args.single_serology,
+        "Clinical": args.single_clinical,
+        "Genetics": args.single_genetics,
+    }
 
-    df_new = load_new_multi_oof(args.multi_oof)
+    # Only run if ALL 4 exist
+    old_paths_resolved = {k: try_path(v) for k, v in old_paths.items()}
+    if all(old_paths_resolved.values()):
+        old_curves = {}
+        for name, path in old_paths_resolved.items():
+            y_true, y_prob = load_old_single_oof(path)  # may raise if wrong format
+            old_curves[name] = (y_true, y_prob)
+
+        fig1 = plot_roc_curves(old_curves, title="ROC Curves (Single Modalities; Old Nested CV)")
+        savefig_all(fig1, os.path.join(args.out_dir, "roc_single_only.png"), dpi=args.dpi, also_pdf=args.also_pdf)
+        plt.close(fig1)
+        print(f"Saved: {os.path.join(args.out_dir, 'roc_single_only.png')}")
+    else:
+        # Only warn if user provided at least one old path but not all 4
+        if any(v is not None for v in old_paths.values()):
+            missing = [k for k, v in old_paths_resolved.items() if v is None]
+            print(f"Skipping roc_single_only.png (missing old single OOF paths for: {missing})")
+        else:
+            print("Skipping roc_single_only.png (no old single OOF paths provided).")
+
+    # -------------------------
+    # 2) ROC: unified multi + unified singles together (REQUIRED)
+    # -------------------------
+    if not os.path.exists(multi_oof):
+        raise FileNotFoundError(
+            f"Missing unified OOF file: {multi_oof}\n"
+            f"Tip: pass --run-dir /path/to/run_YYYYMMDD_HHMMSS or --multi-oof /path/to/oof_predictions.csv"
+        )
+
+    df_new = load_new_multi_oof(multi_oof)
     y_true_new = df_new["y_true"].to_numpy().astype(int)
 
     required_cols = {
@@ -271,9 +301,12 @@ def main():
         "Clinical": "proba_single_clinical",
         "Genetics": "proba_single_genetics",
     }
-    missing = [col for col in required_cols.values() if col not in df_new.columns]
-    if missing:
-        raise ValueError(f"Missing required columns in multi OOF file: {missing}")
+    missing_cols = [col for col in required_cols.values() if col not in df_new.columns]
+    if missing_cols:
+        raise ValueError(
+            f"Missing required columns in unified OOF file: {missing_cols}\n"
+            f"Found columns: {df_new.columns.tolist()}"
+        )
 
     new_curves = {
         name: (y_true_new, df_new[col].to_numpy().astype(float))
@@ -283,30 +316,33 @@ def main():
     fig2 = plot_roc_curves(new_curves, title="ROC Curves (Multi + Single; Intersection OOF)")
     savefig_all(fig2, os.path.join(args.out_dir, "roc_multi_and_single.png"), dpi=args.dpi, also_pdf=args.also_pdf)
     plt.close(fig2)
+    print(f"Saved: {os.path.join(args.out_dir, 'roc_multi_and_single.png')}")
 
     # -------------------------
-    # 3) SHAP: combined subplot figure (Early top20 + Late modality)
+    # 3) SHAP combined figure (OPTIONAL)
     # -------------------------
-    if not os.path.exists(args.shap_early):
-        raise FileNotFoundError(f"Missing early SHAP file: {args.shap_early}")
-    if not os.path.exists(args.shap_late):
-        raise FileNotFoundError(f"Missing late SHAP file: {args.shap_late}")
+    if os.path.exists(shap_early) and os.path.exists(shap_late):
+        plot_shap_early_and_late(
+            shap_early_path=shap_early,
+            shap_late_path=shap_late,
+            out_path_png=os.path.join(args.out_dir, "shap_early_late_combined.png"),
+            dpi=args.dpi,
+            also_pdf=args.also_pdf,
+            top_k=args.top_k,
+        )
+        print(f"Saved: {os.path.join(args.out_dir, 'shap_early_late_combined.png')}")
+    else:
+        missing = []
+        if not os.path.exists(shap_early):
+            missing.append(shap_early)
+        if not os.path.exists(shap_late):
+            missing.append(shap_late)
+        print("Skipping shap_early_late_combined.png (missing SHAP files):")
+        for m in missing:
+            print(f"  - {m}")
 
-    plot_shap_early_and_late(
-        shap_early_path=args.shap_early,
-        shap_late_path=args.shap_late,
-        out_path_png=os.path.join(args.out_dir, "shap_early_late_combined.png"),
-        dpi=args.dpi,
-        also_pdf=args.also_pdf,
-        top_k=20,
-    )
-
-    print("\nSaved plots to:", args.out_dir)
-    print(" - roc_single_only.png")
-    print(" - roc_multi_and_single.png")
-    print(" - shap_early_late_combined.png")
     if args.also_pdf:
-        print(" (+ PDF copies)")
+        print("Also saved PDF copies (where plots were generated).")
 
 
 if __name__ == "__main__":
