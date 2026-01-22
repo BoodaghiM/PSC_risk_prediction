@@ -1,0 +1,63 @@
+# Data / outputs
+*.csv
+*.tsv
+*.xlsx
+*.parquet
+*.h5
+*.hdf5
+*.joblib
+*.pkl
+results*/
+logs*/
+
+# =========================
+# Python / general
+# =========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.env
+.venv
+venv/
+.ipynb_checkpoints/
+
+# =========================
+# HPC / SLURM
+# =========================
+hpc/logs_prediction/
+hpc/logs_multi_modal/
+logs/
+logs_*/
+slurm-*.out
+*.err
+*.out
+
+# =========================
+# Results & models (generated)
+# =========================
+results/
+results_*/
+results_GitHub/
+results_no_leakage/
+
+# Trained models
+*.joblib
+models/
+
+# =========================
+# Temporary / scratch
+# =========================
+tmp/
+scratch/
+*.tmp
+*.log
+
+# =========================
+# OS / editor noise
+# =========================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
