@@ -1,63 +1,24 @@
-# Data / outputs
-*.csv
-*.tsv
-*.xlsx
-*.parquet
-*.h5
-*.hdf5
-*.joblib
-*.pkl
-results*/
-logs*/
-
-# =========================
-# Python / general
-# =========================
+# python
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
-.env
-.venv
+*.egg-info/
+dist/
+build/
+.venv/
 venv/
+.env
+
+# notebooks
 .ipynb_checkpoints/
 
-# =========================
-# HPC / SLURM
-# =========================
-hpc/logs_prediction/
-hpc/logs_multi_modal/
-logs/
-logs_*/
-slurm-*.out
-*.err
-*.out
-
-# =========================
-# Results & models (generated)
-# =========================
-results/
-results_*/
-results_GitHub/
-results_no_leakage/
-
-# Trained models
-*.joblib
-models/
-
-# =========================
-# Temporary / scratch
-# =========================
-tmp/
-scratch/
-*.tmp
-*.log
-
-# =========================
-# OS / editor noise
-# =========================
+# editor/os
 .DS_Store
-Thumbs.db
 .vscode/
 .idea/
 
+# logs / outputs (adjust)
+logs_prediction/
+logs_single_modal/
+*.log
+*.out
+*.err
