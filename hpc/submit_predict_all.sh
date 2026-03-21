@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=psc_score_undiagnosed
+#SBATCH --job-name=psc_score_diagnosed
 #SBATCH --time=01:00:00
 #SBATCH --mem=16G
 #SBATCH --cpus-per-task=2
@@ -19,11 +19,10 @@ mkdir -p logs_prediction
 INPUT_DIR="/common/mcgoverndlab/usr/Miad/PSC/data/data_cleaned/imputed_data"
 PHENO_PATH="/common/mcgoverndlab/usr/Miad/PSC/data/data_cleaned/phenotype_data/data_phenotype_original.csv"
 
-OUT="/common/mcgoverndlab/usr/Miad/PSC/results_GitHub/undiagnosed_predictions/scored_undiagnosed_multi_only_raw_and_cal_with_binaries.csv"
+OUT="/common/mcgoverndlab/usr/Miad/PSC/results_GitHub/all_predictions/scored_diagnosed_multi_only_raw_and_cal_with_binaries.csv"
 mkdir -p "$(dirname "$OUT")"
 
-# NEW: modality availability output (separate file)
-MODAL_OUT="/common/mcgoverndlab/usr/Miad/PSC/results_GitHub/undiagnosed_predictions/undiagnosed_modality_availability.csv"
+MODAL_OUT="/common/mcgoverndlab/usr/Miad/PSC/results_GitHub/all_predictions/diagnosed_modality_availability.csv"
 mkdir -p "$(dirname "$MODAL_OUT")"
 
 MULTI_ROOT="/common/mcgoverndlab/usr/Miad/PSC/results_GitHub/multi_modal"
@@ -39,7 +38,6 @@ echo "Workdir    : $(pwd)"
 echo "Input dir  : ${INPUT_DIR}"
 echo "Pheno path : ${PHENO_PATH}"
 echo "Out file   : ${OUT}"
-echo "Modality   : ${MODAL_OUT}"
 echo "Start time : $(date)"
 
 export OMP_NUM_THREADS=1
@@ -52,16 +50,15 @@ CMD=(python evaluation/predict_with_saved_models.py
   --input-dir "${INPUT_DIR}"
   --pheno-path "${PHENO_PATH}"
   --out "${OUT}"
-  --undiagnosed-only
   --multi-models-dir "${MULTI_MODELS_DIR}"
   --write-modality-availability
   --modality-availability-out "${MODAL_OUT}"
 )
 
-# If calibrators exist, use them (script will check)
+# Calibrated scores
 CMD+=(--calibrate-multi --calibrators-dir "${MULTI_MODELS_DIR}" --calibration-clip "${CAL_CLIP}")
 
-# Emit your ORIGINAL-style binary columns (script will filter to multi only)
+# Binary thresholds
 if [[ -f "${THR_CSV}" ]]; then
   CMD+=(--emit-multi-binaries --thresholds-csv "${THR_CSV}")
 else

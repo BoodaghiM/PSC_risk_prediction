@@ -60,8 +60,7 @@ echo "Start time : $(date)"
 python "${SCRIPT}" \
   --run-dir "${RUN_DIR}" \
   --out-dir "${OUT_DIR}" \
-  --dpi 300 \
-  --also-pdf \
+  --dpi 1000 \
   --top-k 20 \
   --calib-bins 10 \
   --single-clinical "${OLD_CLINICAL}" \
