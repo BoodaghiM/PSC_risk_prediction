@@ -22,3 +22,15 @@ logs_single_modal/
 *.log
 *.out
 *.err
+
+# HPC logs (all variants)
+hpc/logs_*/
+logs_*/
+
+# job outputs
+*.out
+*.err
+*.log
+
+# temporary results (optional but recommended)
+results_GitHub/
